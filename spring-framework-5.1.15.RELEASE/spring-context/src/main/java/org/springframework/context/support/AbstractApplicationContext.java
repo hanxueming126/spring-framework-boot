@@ -534,7 +534,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				postProcessBeanFactory(beanFactory);
 
 				// Invoke factory processors registered as beans in the context.
-				// 调用注册实现了BeanFactoryPostProcessor接口类的postProcessBeanDefinitionRegistry方法
+				// 调用注册实现了BeanFactoryPostProcessor接口类的postProcessBeanDefinitionRegistry方法，
+				// 主要有是两个类 BeanFactoryPostProcessor和BeanDefinitionRegistryPostProcessor，
+				// 会通过beanFactory.getBean方法实例化BeanFactoryPostProcessor，然后执行postProcessBeanDefinitionRegistry
+				// 这一步处理的时候实际上BeanFactory已经准备好了，因此如果想往beanFactory中增加bean可以在这个地方进行处理，
+				// 如ConfigurationClassPostProcessor就是实现了BeanDefinitionRegistryPostProcessor接口，在这里将相关bean加入到了IOC容器中
 				invokeBeanFactoryPostProcessors(beanFactory);
 
 				// Register bean processors that intercept bean creation.
@@ -542,7 +546,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				registerBeanPostProcessors(beanFactory);
 
 				// Initialize message source for this context.
-				//初始化国家化工具类
+				//初始化国际化工具类
 				initMessageSource();
 
 				// Initialize event multicaster for this context.
@@ -609,7 +613,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		}
 
 		// Initialize any placeholder property sources in the context environment.
-		// 初始化任意属性，子类可以实现该方法
+		// 子类可以实现该方法,添加相关属性
 		initPropertySources();
 
 		// Validate that all properties marked as required are resolvable:

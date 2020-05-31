@@ -57,7 +57,7 @@ final class PostProcessorRegistrationDelegate {
 
 		// Invoke BeanDefinitionRegistryPostProcessors first, if any.
 		Set<String> processedBeans = new HashSet<>();
-		// 这里的beanFa实际上就是DefaultListableBeanFactory，是BeanDefinitionRegistry的实现类
+		// 这里的beanFactory实际上就是DefaultListableBeanFactory，是BeanDefinitionRegistry的实现类
 		// 先执行BeanDefinitionRegistryPostProcessor.postProcessBeanDefinitionRegistry
 		if (beanFactory instanceof BeanDefinitionRegistry) {
 			BeanDefinitionRegistry registry = (BeanDefinitionRegistry) beanFactory;
