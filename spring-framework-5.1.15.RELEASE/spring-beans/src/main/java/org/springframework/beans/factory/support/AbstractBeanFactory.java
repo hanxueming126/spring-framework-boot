@@ -314,6 +314,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 				}
 
 				// Create bean instance.
+				// 先判断bean是否是singleton，如果是通过ObjectFactory获取单例实例
 				if (mbd.isSingleton()) {
 					sharedInstance = getSingleton(beanName, () -> {
 						try {
@@ -327,6 +328,8 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 							throw ex;
 						}
 					});
+					// 这里判断如果是FactoryBean，通过FactoryBean.getObejct获取bean实例，
+					// 如果不是FactoryBean，直接返回Bean本身
 					bean = getObjectForBeanInstance(sharedInstance, name, beanName, mbd);
 				}
 
@@ -1639,6 +1642,9 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 	 * @param mbd the merged bean definition
 	 * @return the object to expose for the bean
 	 */
+	// 如果上一步生成的是一个FactoryBean的实例，这里调用FactoryBean的getObject方法生成需要的Bean的实例，
+	// 如果不是FactoryBean，直接返回Bean本身
+
 	protected Object getObjectForBeanInstance(
 			Object beanInstance, String name, String beanName, @Nullable RootBeanDefinition mbd) {
 

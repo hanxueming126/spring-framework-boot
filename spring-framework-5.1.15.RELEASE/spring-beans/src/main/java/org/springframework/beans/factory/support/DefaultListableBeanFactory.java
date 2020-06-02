@@ -891,7 +891,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 		Assert.hasText(beanName, "Bean name must not be empty");
 		Assert.notNull(beanDefinition, "BeanDefinition must not be null");
-
+		// XML配置的这里为true会进入执行，进行注册前的校验
 		if (beanDefinition instanceof AbstractBeanDefinition) {
 			try {
 				((AbstractBeanDefinition) beanDefinition).validate();
@@ -903,6 +903,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		}
 
 		BeanDefinition existingDefinition = this.beanDefinitionMap.get(beanName);
+		//判断BeanDefinition是否已经注册过，如果注册过且允许覆盖按照条件是否覆盖BeanDefinition
 		if (existingDefinition != null) {
 			if (!isAllowBeanDefinitionOverriding()) {
 				throw new BeanDefinitionOverrideException(beanName, beanDefinition, existingDefinition);
@@ -932,6 +933,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			this.beanDefinitionMap.put(beanName, beanDefinition);
 		}
 		else {
+			//如果已经开始创建bean，会进行锁定
 			if (hasBeanCreationStarted()) {
 				// Cannot modify startup-time collection elements anymore (for stable iteration)
 				synchronized (this.beanDefinitionMap) {
@@ -947,14 +949,18 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 				// Still in startup registration phase
 				this.beanDefinitionMap.put(beanName, beanDefinition);
 				this.beanDefinitionNames.add(beanName);
+				// 非容器自动加载，手动注册的单例中是否包含当前BeanDefinition，如果包含会移除注册当前BeanDefinition
 				removeManualSingletonName(beanName);
 			}
 			this.frozenBeanDefinitionNames = null;
 		}
-
+		// BeanDefinition已经注册过，或者
+		// 非容器自动加载，手动注册的单例中是否包含当前BeanDefinition，
+		// 满足这两个条件任意一个触发该方法
 		if (existingDefinition != null || containsSingleton(beanName)) {
 			resetBeanDefinition(beanName);
 		}
+		// 参考启动容器流程，当就绪之后创建容器会冻结配置，
 		else if (isConfigurationFrozen()) {
 			clearByTypeCache();
 		}
