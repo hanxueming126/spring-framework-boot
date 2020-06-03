@@ -176,12 +176,14 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 						parseDefaultElement(ele, delegate);
 					}
 					else {
+						// 解析除import、alias、bean、beans外的其他标签
 						delegate.parseCustomElement(ele);
 					}
 				}
 			}
 		}
 		else {
+			// 解析除import、alias、bean、beans外的其他标签
 			delegate.parseCustomElement(root);
 		}
 	}

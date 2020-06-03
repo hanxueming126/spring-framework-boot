@@ -1396,6 +1396,9 @@ public class BeanDefinitionParserDelegate {
 		if (namespaceUri == null) {
 			return null;
 		}
+		// 获取对应uri处理器，如 <context:component-scan>的时候，
+		// 首先获取<context>对应的uri处理器ContextNamespaceHandler，
+		// 然后获取ContextNamespaceHandler中注册的component-scan的bean解析器
 		NamespaceHandler handler = this.readerContext.getNamespaceHandlerResolver().resolve(namespaceUri);
 		if (handler == null) {
 			error("Unable to locate Spring NamespaceHandler for XML schema namespace [" + namespaceUri + "]", ele);
