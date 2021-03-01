@@ -266,7 +266,9 @@ public class SpringApplication {
 		Assert.notNull(primarySources, "PrimarySources must not be null");
 		this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
 		this.webApplicationType = WebApplicationType.deduceFromClasspath();
+		// 从spring.factories文件中加载 ApplicationContextInitializer类型的类
 		setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
+		// 设置 this.listeners 通过从spring.factories中读取，其中ConfigFileApplicationListener用来读取配置
 		setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
 		this.mainApplicationClass = deduceMainApplicationClass();
 	}
@@ -298,6 +300,10 @@ public class SpringApplication {
 		ConfigurableApplicationContext context = null;
 		Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
 		configureHeadlessProperty();
+		// 得到一个SpringApplicationRunListeners，其属性listeners是通过读取spring.factories配置得到
+		// 为 EventPublishingRunListener，其属性EventPublishingRunListener用来实际事件处理，
+		// 会将SpringApplication.listeners赋值给SimpleApplicationEventMulticaster
+		// 当SimpleApplicationEventMulticaster广播相关事件的时候，就调用SpringApplication.listeners进行对应事件的监听处理
 		SpringApplicationRunListeners listeners = getRunListeners(args);
 		listeners.starting();
 		try {
@@ -305,6 +311,7 @@ public class SpringApplication {
 			ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
 			configureIgnoreBeanInfo(environment);
 			Banner printedBanner = printBanner(environment);
+			// 创建ApplicationContext，如果不是web相关，默认返回 AnnotationConfigApplicationContext
 			context = createApplicationContext();
 			exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
 					new Class[] { ConfigurableApplicationContext.class }, context);
@@ -336,9 +343,12 @@ public class SpringApplication {
 	private ConfigurableEnvironment prepareEnvironment(SpringApplicationRunListeners listeners,
 			ApplicationArguments applicationArguments) {
 		// Create and configure the environment
+		// 默认返回 StandardEnvironment
 		ConfigurableEnvironment environment = getOrCreateEnvironment();
 		configureEnvironment(environment, applicationArguments.getSourceArgs());
 		ConfigurationPropertySources.attach(environment);
+		// 这里实际上就是调用EventPublishingRunListener.environmentPrepared，
+		// 最终是spring.factories中ApplicationListener的onApplicationEvent对应方法来处理
 		listeners.environmentPrepared(environment);
 		bindToSpringApplication(environment);
 		if (!this.isCustomEnvironment) {
@@ -363,7 +373,9 @@ public class SpringApplication {
 	private void prepareContext(ConfigurableApplicationContext context, ConfigurableEnvironment environment,
 			SpringApplicationRunListeners listeners, ApplicationArguments applicationArguments, Banner printedBanner) {
 		context.setEnvironment(environment);
+		// 是否设置相关自定义的处理，如 ResourceLoader，beanNameGenerator
 		postProcessApplicationContext(context);
+		// 调用spring.factories中配置的ApplicationContextInitializer类的initialize方法，这里有些会加入BeanPostProcessor
 		applyInitializers(context);
 		listeners.contextPrepared(context);
 		if (this.logStartupInfo) {
@@ -381,6 +393,7 @@ public class SpringApplication {
 					.setAllowBeanDefinitionOverriding(this.allowBeanDefinitionOverriding);
 		}
 		// Load the sources
+		// 默认返回我们传入的class
 		Set<Object> sources = getAllSources();
 		Assert.notEmpty(sources, "Sources must not be empty");
 		load(context, sources.toArray(new Object[0]));
@@ -595,6 +608,7 @@ public class SpringApplication {
 			context.getBeanFactory().registerSingleton(AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR,
 					this.beanNameGenerator);
 		}
+		// 默认为空
 		if (this.resourceLoader != null) {
 			if (context instanceof GenericApplicationContext) {
 				((GenericApplicationContext) context).setResourceLoader(this.resourceLoader);
@@ -675,6 +689,9 @@ public class SpringApplication {
 		if (logger.isDebugEnabled()) {
 			logger.debug("Loading source " + StringUtils.arrayToCommaDelimitedString(sources));
 		}
+		// 创建 BeanDefinitionLoader ，BeanDefinitionLoader中包含了：
+		// AnnotatedBeanDefinitionReader、XmlBeanDefinitionReader、ClassPathBeanDefinitionScanner
+		// 这些AnnotationConfigApplicationContext常用到的类
 		BeanDefinitionLoader loader = createBeanDefinitionLoader(getBeanDefinitionRegistry(context), sources);
 		if (this.beanNameGenerator != null) {
 			loader.setBeanNameGenerator(this.beanNameGenerator);
@@ -685,6 +702,7 @@ public class SpringApplication {
 		if (this.environment != null) {
 			loader.setEnvironment(this.environment);
 		}
+		// 通过loader的AnnotatedBeanDefinitionReader注册
 		loader.load();
 	}
 
@@ -1106,6 +1124,7 @@ public class SpringApplication {
 	 */
 	public Set<Object> getAllSources() {
 		Set<Object> allSources = new LinkedHashSet<>();
+		// 一般我们都会传入一个class，就是这里的primarySources
 		if (!CollectionUtils.isEmpty(this.primarySources)) {
 			allSources.addAll(this.primarySources);
 		}

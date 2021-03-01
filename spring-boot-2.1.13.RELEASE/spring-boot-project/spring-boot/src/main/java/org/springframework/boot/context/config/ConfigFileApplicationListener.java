@@ -304,6 +304,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			this.environment = environment;
 			this.placeholdersResolver = new PropertySourcesPlaceholdersResolver(this.environment);
 			this.resourceLoader = (resourceLoader != null) ? resourceLoader : new DefaultResourceLoader();
+			// 加载spring.factoruies中PropertySourceLoader对应的类，为PropertiesPropertySourceLoader、YamlPropertySourceLoader
 			this.propertySourceLoaders = SpringFactoriesLoader.loadFactories(PropertySourceLoader.class,
 					getClass().getClassLoader());
 		}
@@ -420,8 +421,11 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 		}
 
 		private void load(Profile profile, DocumentFilterFactory filterFactory, DocumentConsumer consumer) {
+
+			// getSearchLocations 默认返回 DEFAULT_SEARCH_LOCATIONS 切分后的数组，即 [ classpath:/,classpath:/config/,file:./,file:./config/]
 			getSearchLocations().forEach((location) -> {
 				boolean isFolder = location.endsWith("/");
+				// 这里得到默认的配置名称前缀 application
 				Set<String> names = isFolder ? getSearchNames() : NO_SEARCH_NAMES;
 				names.forEach((name) -> load(location, name, profile, filterFactory, consumer));
 			});
@@ -429,14 +433,20 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 
 		private void load(String location, String name, Profile profile, DocumentFilterFactory filterFactory,
 				DocumentConsumer consumer) {
+			// 默认name为application，这个分支跳过
 			if (!StringUtils.hasText(name)) {
+				// this.propertySourceLoaders 为 spring.factoruies中PropertySourceLoader对应的类，为PropertiesPropertySourceLoader、YamlPropertySourceLoader
 				for (PropertySourceLoader loader : this.propertySourceLoaders) {
+					// PropertiesPropertySourceLoader可以加载 "properties", "xml" 后缀文件
+					// YamlPropertySourceLoader可以加载 "yml", "yaml"
+					// 判断路径下是否有符合propertySourceLoaders加载的后缀的文件
 					if (canLoadFileExtension(loader, location)) {
 						load(loader, location, profile, filterFactory.getDocumentFilter(profile), consumer);
 						return;
 					}
 				}
 			}
+			//
 			Set<String> processed = new HashSet<>();
 			for (PropertySourceLoader loader : this.propertySourceLoaders) {
 				for (String fileExtension : loader.getFileExtensions()) {
