@@ -343,7 +343,9 @@ public class SpringApplication {
 	private ConfigurableEnvironment prepareEnvironment(SpringApplicationRunListeners listeners,
 			ApplicationArguments applicationArguments) {
 		// Create and configure the environment
-		// 默认返回 StandardEnvironment
+		// 默认返回 StandardEnvironment，
+		// 并且在父类AbstractEnvironment的默认构造中会调用子类模板方法customizePropertySources
+		// 在StandardEnvironment.customizePropertySources中会读取虚拟机参数和系统的环境变量
 		ConfigurableEnvironment environment = getOrCreateEnvironment();
 		configureEnvironment(environment, applicationArguments.getSourceArgs());
 		ConfigurationPropertySources.attach(environment);
@@ -481,11 +483,14 @@ public class SpringApplication {
 	 * @see #configurePropertySources(ConfigurableEnvironment, String[])
 	 */
 	protected void configureEnvironment(ConfigurableEnvironment environment, String[] args) {
+		// 默认为true
 		if (this.addConversionService) {
 			ConversionService conversionService = ApplicationConversionService.getSharedInstance();
 			environment.setConversionService((ConfigurableConversionService) conversionService);
 		}
+		// 这里主要是读取命令行参数，通过SimpleCommandLineArgsParser解析，必须是 --key=value格式
 		configurePropertySources(environment, args);
+		// 读取profile，通过读取spring.profiles.active设置activeProfile
 		configureProfiles(environment, args);
 	}
 
@@ -498,9 +503,11 @@ public class SpringApplication {
 	 */
 	protected void configurePropertySources(ConfigurableEnvironment environment, String[] args) {
 		MutablePropertySources sources = environment.getPropertySources();
+		// 默认为空，分支跳过
 		if (this.defaultProperties != null && !this.defaultProperties.isEmpty()) {
 			sources.addLast(new MapPropertySource("defaultProperties", this.defaultProperties));
 		}
+		// addCommandLineProperties默认为true，进入分支
 		if (this.addCommandLineProperties && args.length > 0) {
 			String name = CommandLinePropertySource.COMMAND_LINE_PROPERTY_SOURCE_NAME;
 			if (sources.contains(name)) {

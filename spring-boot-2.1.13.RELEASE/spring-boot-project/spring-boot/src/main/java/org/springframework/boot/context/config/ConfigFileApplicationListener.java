@@ -388,7 +388,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 		private void removeUnprocessedDefaultProfiles() {
 			this.profiles.removeIf((profile) -> (profile != null && profile.isDefaultProfile()));
 		}
-
+		// profile为空或者profile不为空且在acceptsProfiles中
 		private DocumentFilter getPositiveProfileFilter(Profile profile) {
 			return (Document document) -> {
 				if (profile == null) {
@@ -398,7 +398,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 						&& this.environment.acceptsProfiles(Profiles.of(document.getProfiles()));
 			};
 		}
-
+		// profile为空且document的profile在acceptsProfiles中
 		private DocumentFilter getNegativeProfileFilter(Profile profile) {
 			return (Document document) -> (profile == null && !ObjectUtils.isEmpty(document.getProfiles())
 					&& this.environment.acceptsProfiles(Profiles.of(document.getProfiles())));
@@ -435,11 +435,8 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 				DocumentConsumer consumer) {
 			// 默认name为application，这个分支跳过
 			if (!StringUtils.hasText(name)) {
-				// this.propertySourceLoaders 为 spring.factoruies中PropertySourceLoader对应的类，为PropertiesPropertySourceLoader、YamlPropertySourceLoader
+				// this.propertySourceLoaders 为 spring.factories中PropertySourceLoader对应的类，为PropertiesPropertySourceLoader、YamlPropertySourceLoader
 				for (PropertySourceLoader loader : this.propertySourceLoaders) {
-					// PropertiesPropertySourceLoader可以加载 "properties", "xml" 后缀文件
-					// YamlPropertySourceLoader可以加载 "yml", "yaml"
-					// 判断路径下是否有符合propertySourceLoaders加载的后缀的文件
 					if (canLoadFileExtension(loader, location)) {
 						load(loader, location, profile, filterFactory.getDocumentFilter(profile), consumer);
 						return;
@@ -469,6 +466,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			DocumentFilter profileFilter = filterFactory.getDocumentFilter(profile);
 			if (profile != null) {
 				// Try profile-specific file & profile section in profile file (gh-340)
+				// 先加载application-profile.properties文件
 				String profileSpecificFile = prefix + "-" + profile + fileExtension;
 				load(loader, profileSpecificFile, profile, defaultFilter, consumer);
 				load(loader, profileSpecificFile, profile, profileFilter, consumer);
@@ -481,12 +479,14 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 				}
 			}
 			// Also try the profile-specific section (if any) of the normal file
+			// 加载application.properties文件
 			load(loader, prefix + fileExtension, profile, profileFilter, consumer);
 		}
 
 		private void load(PropertySourceLoader loader, String location, Profile profile, DocumentFilter filter,
 				DocumentConsumer consumer) {
 			try {
+				// 先判断对应的文件是否存在，如果不存在，则跳过
 				Resource resource = this.resourceLoader.getResource(location);
 				if (resource == null || !resource.exists()) {
 					if (this.logger.isTraceEnabled()) {
@@ -550,6 +550,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			DocumentsCacheKey cacheKey = new DocumentsCacheKey(loader, resource);
 			List<Document> documents = this.loadDocumentsCache.get(cacheKey);
 			if (documents == null) {
+				// .properties返回 OriginTrackedMapPropertySource
 				List<PropertySource<?>> loaded = loader.load(name, resource);
 				documents = asDocuments(loaded);
 				this.loadDocumentsCache.put(cacheKey, documents);
@@ -667,6 +668,8 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 
 		private void addLoadedPropertySources() {
 			MutablePropertySources destination = this.environment.getPropertySources();
+			// this.loaded是一个LinkedHashMap,放入的时候是application-dev.properties,application.properties
+			// 这里进行反转，使application.properties的配置靠前
 			List<MutablePropertySources> loaded = new ArrayList<>(this.loaded.values());
 			Collections.reverse(loaded);
 			String lastAdded = null;
