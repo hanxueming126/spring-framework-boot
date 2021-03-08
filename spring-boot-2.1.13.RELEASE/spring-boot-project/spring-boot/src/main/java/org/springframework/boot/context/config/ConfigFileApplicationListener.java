@@ -45,6 +45,7 @@ import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.bind.PropertySourcesPlaceholdersResolver;
 import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
 import org.springframework.boot.env.EnvironmentPostProcessor;
+import org.springframework.boot.env.PropertiesPropertySourceLoader;
 import org.springframework.boot.env.PropertySourceLoader;
 import org.springframework.boot.env.RandomValuePropertySource;
 import org.springframework.boot.logging.DeferredLog;
@@ -108,7 +109,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 
 	// Note the order is from least to most specific (last one wins)
 	private static final String DEFAULT_SEARCH_LOCATIONS = "classpath:/,classpath:/config/,file:./,file:./config/";
-
+	//private static final String DEFAULT_SEARCH_LOCATIONS = "classpath:/";
 	private static final String DEFAULT_NAMES = "application";
 
 	private static final Set<String> NO_SEARCH_NAMES = Collections.singleton(null);
@@ -304,7 +305,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			this.environment = environment;
 			this.placeholdersResolver = new PropertySourcesPlaceholdersResolver(this.environment);
 			this.resourceLoader = (resourceLoader != null) ? resourceLoader : new DefaultResourceLoader();
-			// 加载spring.factoruies中PropertySourceLoader对应的类，为PropertiesPropertySourceLoader、YamlPropertySourceLoader
+			// 加载spring.factories中PropertySourceLoader对应的类，为PropertiesPropertySourceLoader、YamlPropertySourceLoader
 			this.propertySourceLoaders = SpringFactoriesLoader.loadFactories(PropertySourceLoader.class,
 					getClass().getClassLoader());
 		}
@@ -314,7 +315,11 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			this.processedProfiles = new LinkedList<>();
 			this.activatedProfiles = false;
 			this.loaded = new LinkedHashMap<>();
+			// 默认返回null和default两个
 			initializeProfiles();
+			// 这里首先读取的就是默认的两个null和default，
+			// 如果在读取的文件中发现还有其他的profile，会将其加入到this.profiles中
+			// 这样，就完成了对其他profile的读取
 			while (!this.profiles.isEmpty()) {
 				Profile profile = this.profiles.poll();
 				if (profile != null && !profile.isDefaultProfile()) {
@@ -388,7 +393,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 		private void removeUnprocessedDefaultProfiles() {
 			this.profiles.removeIf((profile) -> (profile != null && profile.isDefaultProfile()));
 		}
-		// profile为空或者profile不为空且在acceptsProfiles中
+		// profile为空或者profile不为空且在environment的acceptsProfiles中
 		private DocumentFilter getPositiveProfileFilter(Profile profile) {
 			return (Document document) -> {
 				if (profile == null) {
@@ -464,6 +469,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 				Profile profile, DocumentFilterFactory filterFactory, DocumentConsumer consumer) {
 			DocumentFilter defaultFilter = filterFactory.getDocumentFilter(null);
 			DocumentFilter profileFilter = filterFactory.getDocumentFilter(profile);
+			// 第一个来的，profile=null，第二个是default
 			if (profile != null) {
 				// Try profile-specific file & profile section in profile file (gh-340)
 				// 先加载application-profile.properties文件
@@ -515,6 +521,9 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 					return;
 				}
 				List<Document> loaded = new ArrayList<>();
+				// 这里读取到的document是可能包含多个profile的，会读取配置文件中spring.profiles配置，
+				// yaml类型文件可能会将多个profile文件放在同一个文件中
+				// 因为一开始读取的就是默认的配置，application.properties和application-default.properties配置
 				for (Document document : documents) {
 					if (filter.match(document)) {
 						addActiveProfiles(document.getActiveProfiles());
@@ -550,7 +559,8 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			DocumentsCacheKey cacheKey = new DocumentsCacheKey(loader, resource);
 			List<Document> documents = this.loadDocumentsCache.get(cacheKey);
 			if (documents == null) {
-				// .properties返回 OriginTrackedMapPropertySource
+				// .properties返回 OriginTrackedMapPropertySource，list只有一个，
+				// 但是yaml则可能有多个，因为在yaml中可以配置多个profile，也可以通过spring.profiles指定有哪些profile
 				List<PropertySource<?>> loaded = loader.load(name, resource);
 				documents = asDocuments(loaded);
 				this.loadDocumentsCache.put(cacheKey, documents);
@@ -565,6 +575,8 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			return loaded.stream().map((propertySource) -> {
 				Binder binder = new Binder(ConfigurationPropertySources.from(propertySource),
 						this.placeholdersResolver);
+				// 这里构造了Document，可以看到，会获取配置中的spring.profiles、spring.profiles.active、spring.profiles.included
+				// 会将上述profile信息放入到this.profiles中，如果有active，则设置当前activatedProfiles=true，如果已经设置过了，不会覆盖
 				return new Document(propertySource, binder.bind("spring.profiles", STRING_ARRAY).orElse(null),
 						getProfiles(binder, ACTIVE_PROFILES_PROPERTY), getProfiles(binder, INCLUDE_PROFILES_PROPERTY));
 			}).collect(Collectors.toList());

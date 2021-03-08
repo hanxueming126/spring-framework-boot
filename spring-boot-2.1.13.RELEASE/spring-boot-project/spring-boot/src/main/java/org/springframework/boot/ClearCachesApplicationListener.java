@@ -27,7 +27,8 @@ import org.springframework.util.ReflectionUtils;
  *
  * @author Phillip Webb
  */
-
+public class ClearCachesApplicationListener
+implements ApplicationListener<ContextRefreshedEvent> {
 	@Override
 	public void onApplicationEvent(ContextRefreshedEvent event) {
 		ReflectionUtils.clearCache();
